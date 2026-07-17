@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type PaginationState,
+  type SortingState,
+} from '@tanstack/react-table';
 import type { Findings } from '../parser/types';
 
 interface FindingsPageProps {
@@ -14,6 +24,7 @@ const severityRank: Record<string, number> = {
   LOW: 2,
   INFO: 1,
 };
+const columnHelper = createColumnHelper<Findings>();
 
 function normalizeSeverity(value?: string) {
   const normalized = (value ?? '').trim().toUpperCase();
@@ -31,12 +42,6 @@ function getSeverityTone(severity: string) {
   return 'bg-[#1D4ED8] text-[#DBEAFE]';
 }
 
-function getStatusText(finding: Findings) {
-  if (finding.fixedVersion) return 'Fixable';
-  if (finding.severity?.toLowerCase() === 'critical' || finding.severity?.toLowerCase() === 'high') return 'Open';
-  return 'Observed';
-}
-
 function formatValue(value?: string | number | null) {
   if (value === undefined || value === null || value === '') return '—';
   return String(value);
@@ -49,8 +54,9 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
   const [packageFilter, setPackageFilter] = useState('ALL');
   const [dependencyFilter, setDependencyFilter] = useState('ALL');
   const [onlyFixable, setOnlyFixable] = useState(false);
-  const [sortMode, setSortMode] = useState('severity');
   const [selectedFinding, setSelectedFinding] = useState<Findings | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'severity', desc: true }]);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   const normalizedFindings = useMemo(
     () => findings.map((finding) => ({ ...finding, severity: normalizeSeverity(finding.severity) })),
@@ -62,41 +68,87 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
     return Array.from(uniquePackages).sort((left, right) => left.localeCompare(right));
   }, [normalizedFindings]);
 
-  const filteredFindings = useMemo(() => {
+  const data = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
+    return [...normalizedFindings].filter((finding) => {
+      const severity = (finding.severity ?? 'info').toUpperCase();
+      const matchesSearch =
+        !query ||
+        [finding.vulnerabilityId, finding.title, finding.packageName, finding.target, finding.description ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+      const matchesSeverity = severityFilter === 'ALL' || severity === severityFilter;
+      const matchesPackage = packageFilter === 'ALL' || finding.packageName === packageFilter;
+      const matchesDependency =
+        dependencyFilter === 'ALL' ||
+        (dependencyFilter === 'DIRECT' && finding.isDirect) ||
+        (dependencyFilter === 'TRANSITIVE' && !finding.isDirect);
+      const matchesFixable = !onlyFixable || Boolean(finding.fixedVersion);
+      return matchesSearch && matchesSeverity && matchesPackage && matchesDependency && matchesFixable;
+    });
+  }, [dependencyFilter, normalizedFindings, onlyFixable, packageFilter, searchValue, severityFilter]);
 
-    return [...normalizedFindings]
-      .filter((finding) => {
-        const severity = (finding.severity ?? 'info').toUpperCase();
-        const matchesSearch =
-          !query ||
-          [finding.vulnerabilityId, finding.title, finding.packageName, finding.target, finding.description ?? '']
-            .join(' ')
-            .toLowerCase()
-            .includes(query);
-        const matchesSeverity = severityFilter === 'ALL' || severity === severityFilter;
-        const matchesPackage = packageFilter === 'ALL' || finding.packageName === packageFilter;
-        const matchesDependency =
-          dependencyFilter === 'ALL' ||
-          (dependencyFilter === 'DIRECT' && finding.isDirect) ||
-          (dependencyFilter === 'TRANSITIVE' && !finding.isDirect);
-        const matchesFixable = !onlyFixable || Boolean(finding.fixedVersion);
-        return matchesSearch && matchesSeverity && matchesPackage && matchesDependency && matchesFixable;
-      })
-      .sort((left, right) => {
-        if (sortMode === 'severity') {
-          return severityRank[right.severity?.toUpperCase() ?? 'INFO'] - severityRank[left.severity?.toUpperCase() ?? 'INFO'] ||
-            left.vulnerabilityId.localeCompare(right.vulnerabilityId);
-        }
-        if (sortMode === 'package') {
-          return left.packageName.localeCompare(right.packageName);
-        }
-        if (sortMode === 'title') {
-          return left.title.localeCompare(right.title);
-        }
-        return left.vulnerabilityId.localeCompare(right.vulnerabilityId);
-      });
-  }, [dependencyFilter, normalizedFindings, onlyFixable, packageFilter, searchValue, severityFilter, sortMode]);
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('severity', {
+        id: 'severity',
+        header: 'Severity',
+        cell: ({ getValue }) => {
+          const severity = String(getValue()).toUpperCase();
+          return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityTone(severity)}`}>{severity}</span>;
+        },
+        sortingFn: (rowA, rowB) => {
+          const rankA = severityRank[String(rowA.getValue('severity')).toUpperCase()] ?? 0;
+          const rankB = severityRank[String(rowB.getValue('severity')).toUpperCase()] ?? 0;
+          return rankA - rankB;
+        },
+      }),
+      columnHelper.accessor('vulnerabilityId', {
+        id: 'vulnerabilityId',
+        header: 'Vulnerability ID',
+        cell: ({ getValue }) => <span className="font-medium text-[#F8FAFC]">{formatValue(getValue())}</span>,
+      }),
+      columnHelper.accessor('title', {
+        id: 'title',
+        header: 'Title',
+        cell: ({ getValue }) => <div className="max-w-[320px] truncate">{formatValue(getValue())}</div>,
+      }),
+      columnHelper.accessor('packageName', {
+        id: 'packageName',
+        header: 'Package',
+        cell: ({ getValue }) => formatValue(getValue()),
+      }),
+      columnHelper.accessor('installedVersion', {
+        id: 'installedVersion',
+        header: 'Installed Version',
+        cell: ({ getValue }) => formatValue(getValue()),
+      }),
+      columnHelper.accessor('fixedVersion', {
+        id: 'fixedVersion',
+        header: 'Fixed Version',
+        cell: ({ getValue }) => formatValue(getValue()),
+      }),
+      columnHelper.accessor('cvssScore', {
+        id: 'cvssScore',
+        header: 'CVSS',
+        cell: ({ getValue }) => formatValue(getValue()),
+      }),
+    ],
+    [],
+  );
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    enableSortingRemoval: false,
+  });
 
   const selectedReferences = useMemo(() => {
     if (!selectedFinding) return [];
@@ -106,6 +158,11 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
     }
     return references;
   }, [selectedFinding]);
+
+  const advisoryLink = useMemo(() => {
+    if (!selectedFinding) return undefined;
+    return selectedFinding.advisoryUrl ?? selectedReferences.find((reference) => /github\.com\/advisories|ghsa/i.test(reference)) ?? selectedReferences[0] ?? undefined;
+  }, [selectedFinding, selectedReferences]);
 
   return (
     <div className="min-h-screen bg-[#0B1220] px-4 py-6 text-[#F8FAFC] sm:px-6 lg:px-8">
@@ -128,7 +185,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
         </header>
 
         <section className="rounded-[20px] border border-[#273548] bg-[#111827] p-4 shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
-          <div className="grid gap-3 lg:grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr_0.6fr]">
+          <div className="grid gap-3 lg:grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr]">
             <label className="flex flex-col gap-2 text-sm text-[#CBD5E1]">
               <span>Search vulnerabilities</span>
               <input
@@ -183,20 +240,6 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                 <option value="TRANSITIVE">Transitive</option>
               </select>
             </label>
-
-            <label className="flex flex-col justify-end gap-2 text-sm text-[#CBD5E1]">
-              <span>Sort</span>
-              <select
-                value={sortMode}
-                onChange={(event) => setSortMode(event.target.value)}
-                className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]"
-              >
-                <option value="severity">Severity</option>
-                <option value="id">Vulnerability ID</option>
-                <option value="package">Package</option>
-                <option value="title">Title</option>
-              </select>
-            </label>
           </div>
 
           <label className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#273548] bg-[#182231] px-3 py-2 text-sm text-[#CBD5E1]">
@@ -205,72 +248,83 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
           </label>
         </section>
 
-        <section className="flex min-h-[70vh] gap-4">
+        <section className="relative flex min-h-[70vh] gap-4">
           <div className="flex-1 overflow-hidden rounded-[20px] border border-[#273548] bg-[#111827] shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
             <div className="overflow-auto">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1E293B] text-left text-xs uppercase tracking-[0.24em] text-[#94A3B8]">
-                  <tr>
-                    <th className="px-4 py-3">Severity</th>
-                    <th className="px-4 py-3">Vulnerability ID</th>
-                    <th className="px-4 py-3">Title</th>
-                    <th className="px-4 py-3">Package</th>
-                    <th className="px-4 py-3">Installed Version</th>
-                    <th className="px-4 py-3">Fixed Version</th>
-                    <th className="px-4 py-3">Dependency Type</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <th key={header.id} className="px-4 py-3">
+                          {header.isPlaceholder ? null : (
+                            <button
+                              type="button"
+                              className="flex items-center gap-2 font-medium uppercase tracking-[0.24em] text-[#94A3B8]"
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                              <span className="text-[10px] text-[#64748B]">
+                                {header.column.getIsSorted() === 'desc' ? '↓' : header.column.getIsSorted() === 'asc' ? '↑' : '↕'}
+                              </span>
+                            </button>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
                 </thead>
                 <tbody>
-                  {filteredFindings.length === 0 ? (
+                  {table.getRowModel().rows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-[#94A3B8]">
+                      <td colSpan={7} className="px-4 py-10 text-center text-[#94A3B8]">
                         No findings match the current filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredFindings.map((finding) => {
-                      const severity = (finding.severity ?? 'info').toUpperCase();
-                      return (
-                        <tr
-                          key={finding.id}
-                          tabIndex={0}
-                          onClick={() => setSelectedFinding(finding)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              setSelectedFinding(finding);
-                            }
-                          }}
-                          className="cursor-pointer border-t border-[#273548] bg-[#182231] text-[#CBD5E1] transition-colors duration-200 hover:bg-[#1E293B]"
-                        >
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityTone(severity)}`}>
-                              {severity}
-                            </span>
+                    table.getRowModel().rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        tabIndex={0}
+                        onClick={() => setSelectedFinding(row.original)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedFinding(row.original);
+                          }
+                        }}
+                        className="cursor-pointer border-t border-[#273548] bg-[#182231] text-[#CBD5E1] transition-colors duration-200 hover:bg-[#1E293B]"
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id} className="px-4 py-3">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
-                          <td className="px-4 py-3 font-medium text-[#F8FAFC]">{formatValue(finding.vulnerabilityId)}</td>
-                          <td className="max-w-[320px] px-4 py-3">
-                            <div className="truncate">{formatValue(finding.title)}</div>
-                          </td>
-                          <td className="px-4 py-3">{formatValue(finding.packageName)}</td>
-                          <td className="px-4 py-3">{formatValue(finding.installedVersion)}</td>
-                          <td className="px-4 py-3">{formatValue(finding.fixedVersion)}</td>
-                          <td className="px-4 py-3">{finding.isDirect ? 'Direct' : 'Transitive'}</td>
-                          <td className="px-4 py-3">{getStatusText(finding)}</td>
-                        </tr>
-                      );
-                    })
+                        ))}
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-[#273548] bg-[#0B1220] px-4 py-3 text-sm text-[#CBD5E1]">
+              <div>
+                Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, data.length)} of {data.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="rounded-lg border border-[#273548] px-3 py-1.5" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                  Previous
+                </button>
+                <button type="button" className="rounded-lg border border-[#273548] px-3 py-1.5" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                  Next
+                </button>
+              </div>
             </div>
           </div>
 
           {selectedFinding ? (
             <>
-              <div className="fixed inset-0 z-10 bg-[#020617]/70 lg:hidden" onClick={() => setSelectedFinding(null)} />
-              <aside className="fixed inset-y-0 right-0 z-20 flex w-full max-w-[440px] flex-col border-l border-[#273548] bg-[#111827] shadow-[0_20px_60px_rgba(2,8,23,0.55)] lg:static lg:h-auto lg:rounded-[20px] lg:border lg:shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
+              <div className="fixed inset-0 z-20 bg-[#020617]/70" onClick={() => setSelectedFinding(null)} />
+              <aside className="fixed inset-y-0 right-0 z-30 flex w-full max-w-[440px] flex-col border-l border-[#273548] bg-[#111827] shadow-[0_20px_60px_rgba(2,8,23,0.55)]">
                 <div className="flex items-center justify-between border-b border-[#273548] px-5 py-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-[#22D3EE]">Vulnerability Details</p>
@@ -293,17 +347,13 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                         </span>
                         <span className="text-[#94A3B8]">{formatValue(selectedFinding.title)}</span>
                       </div>
-                      <p className="mt-3 text-base font-semibold text-[#F8FAFC]">{formatValue(selectedFinding.title)}</p>
+                      <p className="mt-3 break-words text-base font-semibold text-[#F8FAFC]">{formatValue(selectedFinding.title)}</p>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Package</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.packageName)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Dependency Type</p>
-                        <p className="mt-2 font-medium text-[#F8FAFC]">{selectedFinding.isDirect ? 'Direct' : 'Transitive'}</p>
                       </div>
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Installed Version</p>
@@ -317,13 +367,17 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
 
                     <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                       <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Description</p>
-                      <p className="mt-2 leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.description ?? 'No additional description provided for this finding.')}</p>
+                      <p className="mt-2 whitespace-pre-wrap leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.description ?? 'No additional description provided for this finding.')}</p>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CVSS Score</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.cvssScore)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CVSS Vector</p>
+                        <p className="mt-2 break-words font-medium text-[#F8FAFC]">{formatValue(selectedFinding.cvssVector)}</p>
                       </div>
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CWE</p>
@@ -357,24 +411,23 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Published Date</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.publishedAt)}</p>
                       </div>
+                    </div>
+
+                    {selectedFinding.dependencyPath && selectedFinding.dependencyPath.length > 0 ? (
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Status</p>
-                        <p className="mt-2 font-medium text-[#F8FAFC]">{getStatusText(selectedFinding)}</p>
+                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Dependency Path</p>
+                        <p className="mt-2 break-words leading-6 text-[#CBD5E1]">{selectedFinding.dependencyPath.join(' → ')}</p>
                       </div>
-                    </div>
+                    ) : null}
 
-                    <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Affected Paths</p>
-                      <p className="mt-2 leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.target)}</p>
-                      {selectedFinding.dependencyPath && selectedFinding.dependencyPath.length > 0 ? (
-                        <p className="mt-2 leading-6 text-[#CBD5E1]">{selectedFinding.dependencyPath.join(' → ')}</p>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Advisory Information</p>
-                      <p className="mt-2 leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.advisoryUrl)}</p>
-                    </div>
+                    {advisoryLink ? (
+                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Advisory Information</p>
+                        <a href={advisoryLink} target="_blank" rel="noreferrer" className="mt-2 block break-words leading-6 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
+                          {advisoryLink}
+                        </a>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </aside>

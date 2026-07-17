@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { StatusDot } from '../components/common/statusDot';
@@ -51,9 +52,10 @@ export default function DashboardPage({ findings }: DashboardPageProps) {
   const scanner = normalizedFindings[0]?.scanner ?? 'Unknown';
   const projectName = normalizedFindings[0]?.target ?? 'Unspecified';
   const generatedTime = normalizedFindings[0]?.publishedAt ?? 'Not available';
-  const dependencies = normalizedFindings[0]?.target ? 1 : 0;
-  const directDependencies = normalizedFindings.filter((finding) => finding.isDirect).length;
-  const indirectDependencies = Math.max(0, totalFindings - directDependencies);
+  const chartData = useMemo(
+    () => severityDistribution.filter((item) => item.count > 0),
+    [severityDistribution],
+  );
 
   return (
     <div className="min-h-screen bg-[#0B1220] px-4 py-8 text-[#F8FAFC] sm:px-6 lg:px-8">
@@ -98,7 +100,18 @@ export default function DashboardPage({ findings }: DashboardPageProps) {
         <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <Card title="Severity Distribution" action={<span className="text-sm text-[#94A3B8]">Current scan</span>}>
             <div className="flex flex-col gap-6 md:flex-row md:items-center">
-              <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full border-[18px] border-[#1E293B]" style={{ borderTopColor: severityColors.CRITICAL, borderRightColor: severityColors.HIGH, borderBottomColor: severityColors.LOW, borderLeftColor: severityColors.INFO }} />
+              <div className="mx-auto h-52 w-full max-w-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={chartData} dataKey="count" nameKey="severity" innerRadius={64} outerRadius={96} paddingAngle={2}>
+                      {chartData.map((entry) => (
+                        <Cell key={entry.severity} fill={severityColors[entry.severity] ?? '#64748B'} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [value ?? '0', 'findings']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <div className="flex-1 space-y-3">
                 {severityDistribution.map((item) => (
                   <div key={item.severity} className="flex items-center justify-between rounded-xl border border-[#273548] bg-[#111827] px-3 py-2">
@@ -106,7 +119,7 @@ export default function DashboardPage({ findings }: DashboardPageProps) {
                       <StatusDot color={severityColors[item.severity] ?? '#64748B'} />
                       <span>{item.severity}</span>
                     </div>
-                    <span className="font-medium text-[#F8FAFC]">{item.count}</span>
+                    <span className="text-xs uppercase tracking-[0.24em] text-[#64748B]">{item.count} findings</span>
                   </div>
                 ))}
               </div>
@@ -114,17 +127,12 @@ export default function DashboardPage({ findings }: DashboardPageProps) {
           </Card>
 
           <Card title="Quick Scan Information" action={<span className="text-sm text-[#94A3B8]">Summary</span>}>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               {[
                 { label: 'Scanner', value: scanner },
-                { label: 'Project Name', value: projectName },
-                { label: 'Generated Time', value: generatedTime },
-                { label: 'Dependencies', value: dependencies },
-                { label: 'Direct Dependencies', value: directDependencies },
-                { label: 'Indirect Dependencies', value: indirectDependencies },
-                { label: 'Fixable Vulnerabilities', value: fixableCount },
-                { label: 'Total Vulnerabilities', value: totalFindings },
-              ].filter((item) => Boolean(item.value) || item.value === 0).map((item) => (
+                { label: 'Project', value: projectName },
+                { label: 'Timestamp', value: generatedTime },
+              ].filter((item) => Boolean(item.value)).map((item) => (
                 <div key={item.label} className="rounded-xl border border-[#273548] bg-[#111827] p-4">
                   <p className="text-sm text-[#94A3B8]">{item.label}</p>
                   <p className="mt-2 font-medium text-[#F8FAFC]">{String(item.value)}</p>
@@ -134,7 +142,7 @@ export default function DashboardPage({ findings }: DashboardPageProps) {
           </Card>
         </section>
 
-        <Card title="Top Critical Findings" action={<span className="text-sm text-[#94A3B8]">Highest priority</span>}>
+        <Card title="Highest Priority Findings" action={<span className="text-sm text-[#94A3B8]">Highest priority</span>}>
           <div className="overflow-hidden rounded-[14px] border border-[#273548]">
             <div className="grid grid-cols-[0.8fr_1.2fr_0.9fr_0.8fr_0.9fr_0.7fr] gap-3 bg-[#1E293B] px-4 py-3 text-sm text-[#CBD5E1]">
               <span>Severity</span>

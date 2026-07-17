@@ -1,0 +1,113 @@
+@keyframes tracking-in-expand {
+  0% {
+    letter-spacing: -0.5em;
+    opacity: 0;
+  }
+
+  40% {
+    opacity: 0.6;
+  }
+
+  100% {
+    letter-spacing: normal;
+    opacity: 1;
+  }
+}
+
+.tracking-in-expand {
+  animation: tracking-in-expand .75s cubic-bezier(.215,.61,.355,1) both;
+}
+
+@keyframes text-focus-in {
+  0% {
+    filter: blur(12px);
+    opacity: 0;
+  }
+
+  100% {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+.text-focus-in {
+  animation: text-focus-in .7s ease-out both;
+}
+
+@keyframes slide-in-fwd-center {
+  0% {
+    transform: perspective(1000px) translateZ(-120px) translateY(20px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: perspective(1000px) translateZ(0) translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-fwd-center {
+  animation: slide-in-fwd-center .6s cubic-bezier(.25,.46,.45,.94) both;
+}
+
+@keyframes card-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(32px) scale(.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-reveal {
+  animation: card-reveal .65s cubic-bezier(.22,1,.36,1) both;
+}
+
+.card-delay-1 {
+  animation-delay: .35s;
+}
+
+.card-delay-2 {
+  animation-delay: .5s;
+}
+
+@keyframes scale-fade {
+  0% {
+    opacity: 0;
+    transform: scale(.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-fade {
+  animation: scale-fade .5s ease-out .55s both;
+}
+
+.delay-200 {
+  animation-delay: .2s;
+}
+
+.delay-400 {
+  animation-delay: .4s;
+}
+
+@keyframes float {
+  0%,100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
