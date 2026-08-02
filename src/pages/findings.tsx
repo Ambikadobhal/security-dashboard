@@ -60,6 +60,15 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'severity', desc: true }]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
+  const resetFilters = () => {
+    setSearchValue('');
+    setSeverityFilter('ALL');
+    setPackageFilter('ALL');
+    setDependencyFilter('ALL');
+    setOnlyFixable(false);
+    setPagination({ pageIndex: 0, pageSize: 10 });
+  };
+
   const normalizedFindings = useMemo(
     () => findings.map((finding) => ({ ...finding, severity: normalizeSeverity(finding.severity) })),
     [findings],
@@ -173,76 +182,56 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
         <header className="rounded-[20px] border border-[#273548] bg-[#111827] p-6 shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#22D3EE]">Findings</p>
               <h1 className="mt-2 text-3xl font-semibold text-[#F8FAFC]">Findings</h1>
               <p className="mt-2 text-sm text-[#94A3B8]">{findings.length} total findings</p>
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center justify-center rounded-xl border border-[#273548] bg-transparent px-4 py-2 text-sm font-medium text-[#CBD5E1] transition-all duration-200 hover:border-[#3B82F6] hover:text-[#F8FAFC]"
-            >
+
+            <button type="button" onClick={() => navigate("/dashboard")} className="inline-flex items-center justify-center rounded-xl border border-[#273548] bg-transparent px-4 py-2 text-sm font-medium text-[#CBD5E1] transition-all duration-200 hover:border-[#3B82F6] hover:text-[#F8FAFC]">
               Back to Overview
             </button>
           </div>
         </header>
 
         <section className="rounded-[20px] border border-[#273548] bg-[#111827] p-4 shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
-          <div className="grid gap-3 lg:grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr]">
+          <div className="grid gap-3 lg:grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr_auto]">
             <label className="flex flex-col gap-2 text-sm text-[#CBD5E1]">
               <span>Search vulnerabilities</span>
-              <input
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Search CVE, title, package..."
-                className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]"
-              />
+              <input value={searchValue} onChange={(event) => setSearchValue(event.target.value)} placeholder="Search CVE, title, package..." className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]" />
             </label>
 
             <label className="flex flex-col gap-2 text-sm text-[#CBD5E1]">
               <span>Severity</span>
-              <select
-                value={severityFilter}
-                onChange={(event) => setSeverityFilter(event.target.value)}
-                className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]"
-              >
+              <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)} className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]">
                 <option value="ALL">All severities</option>
-                {severityOrder.map((severity) => (
-                  <option key={severity} value={severity}>
-                    {severity}
-                  </option>
-                ))}
+                {severityOrder.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
               </select>
             </label>
 
             <label className="flex flex-col gap-2 text-sm text-[#CBD5E1]">
               <span>Package</span>
-              <select
-                value={packageFilter}
-                onChange={(event) => setPackageFilter(event.target.value)}
-                className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]"
-              >
+              <select value={packageFilter} onChange={(event) => setPackageFilter(event.target.value)} className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]">
                 <option value="ALL">All packages</option>
-                {packages.map((packageName) => (
-                  <option key={packageName} value={packageName}>
-                    {packageName}
-                  </option>
-                ))}
+                {packages.map((packageName) => <option key={packageName} value={packageName}>{packageName}</option>)}
               </select>
             </label>
 
             <label className="flex flex-col gap-2 text-sm text-[#CBD5E1]">
               <span>Dependency</span>
-              <select
-                value={dependencyFilter}
-                onChange={(event) => setDependencyFilter(event.target.value)}
-                className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]"
-              >
+              <select value={dependencyFilter} onChange={(event) => setDependencyFilter(event.target.value)} className="rounded-xl border border-[#273548] bg-[#0B1220] px-3 py-2.5 text-sm text-[#F8FAFC] outline-none transition-colors duration-200 focus:border-[#22D3EE]">
                 <option value="ALL">All</option>
                 <option value="DIRECT">Direct</option>
                 <option value="TRANSITIVE">Transitive</option>
               </select>
             </label>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex w-full items-center justify-center rounded-xl border border-[#273548] bg-[#182231] px-3 py-2 text-sm font-medium text-[#CBD5E1] transition-all duration-200 hover:border-[#3B82F6] hover:text-[#F8FAFC]">
+                Clear All
+              </button>
+            </div>
           </div>
 
           <label className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#273548] bg-[#182231] px-3 py-2 text-sm text-[#CBD5E1]">
@@ -251,9 +240,9 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
           </label>
         </section>
 
-        <section className="relative flex min-h-[70vh] gap-4">
-          <div className="flex-1 overflow-hidden rounded-[20px] border border-[#273548] bg-[#111827] shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
-            <div className="overflow-auto">
+        <section className="relative flex gap-4">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-[20px] border border-[#273548] bg-[#111827] shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
+            <div className="max-h-[60vh] overflow-auto">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1E293B] text-left text-xs uppercase tracking-[0.24em] text-[#94A3B8]">
                   {table.getHeaderGroups().map((headerGroup) => (
@@ -261,14 +250,10 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                       {headerGroup.headers.map((header) => (
                         <th key={header.id} className="px-4 py-3">
                           {header.isPlaceholder ? null : (
-                            <button
-                              type="button"
-                              className="flex items-center gap-2 font-medium uppercase tracking-[0.24em] text-[#94A3B8]"
-                              onClick={header.column.getToggleSortingHandler()}
-                            >
+                            <button type="button" className="flex items-center gap-2 font-medium uppercase tracking-[0.24em] text-[#94A3B8]" onClick={header.column.getToggleSortingHandler()}>
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               <span className="text-[10px] text-[#64748B]">
-                                {header.column.getIsSorted() === 'desc' ? '↓' : header.column.getIsSorted() === 'asc' ? '↑' : '↕'}
+                                {header.column.getIsSorted() === "desc" ? "↓" : header.column.getIsSorted() === "asc" ? "↑" : "↕"}
                               </span>
                             </button>
                           )}
@@ -277,6 +262,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                     </tr>
                   ))}
                 </thead>
+
                 <tbody>
                   {table.getRowModel().rows.length === 0 ? (
                     <tr>
@@ -291,7 +277,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                         tabIndex={0}
                         onClick={() => setSelectedFinding(row.original)}
                         onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
+                          if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
                             setSelectedFinding(row.original);
                           }
@@ -309,14 +295,17 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                 </tbody>
               </table>
             </div>
+
             <div className="flex items-center justify-between border-t border-[#273548] bg-[#0B1220] px-4 py-3 text-sm text-[#CBD5E1]">
               <div>
                 Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, data.length)} of {data.length}
               </div>
+
               <div className="flex items-center gap-2">
                 <button type="button" className="rounded-lg border border-[#273548] px-3 py-1.5" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
                   Previous
                 </button>
+
                 <button type="button" className="rounded-lg border border-[#273548] px-3 py-1.5" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
                   Next
                 </button>
@@ -331,12 +320,9 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                 <div className="flex items-center justify-between border-b border-[#273548] px-5 py-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-[#22D3EE]">Vulnerability Details</p>
-                    <div className="mt-2 flex items-center justify-center gap-4">
-                      <span
-                        className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${getSeverityTone(
-                          (selectedFinding.severity ?? "info").toUpperCase()
-                        )}`}
-                      >
+
+                    <div className="mt-2 flex items-center justify-start gap-4">
+                      <span className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${getSeverityTone((selectedFinding.severity ?? "info").toUpperCase())}`}>
                         {(selectedFinding.severity ?? "info").toUpperCase()}
                       </span>
 
@@ -345,11 +331,8 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                       </h2>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFinding(null)}
-                    className="px-2 py-2 text-[#CBD5E1] transition-colors duration-200 "
-                  >
+
+                  <button type="button" onClick={() => setSelectedFinding(null)} className="px-2 py-2 text-[#CBD5E1] transition-colors duration-200">
                     ×
                   </button>
                 </div>
@@ -389,6 +372,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                         <div className="mt-0.5 flex flex-wrap gap-2">
                           {(selectedFinding.cweIds ?? []).map((cwe) => (
                             <span
+                              key={cwe}
                               className="inline-flex items-center rounded-lg border border-[#24334A] bg-[#1A2437] px-2 py-0.5 text-xs font-medium text-[#B8C6DD]">
                               {cwe}
                             </span>))}</div>)}
@@ -397,7 +381,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                       <p className="text-sm uppercase tracking-[0.24em] text-[#94A3B8]">Description</p>
                       <p className="mt-2 whitespace-pre-wrap leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.description ?? 'No additional description provided for this finding.')}</p>
                     </div>
-                    
+
                     {selectedFinding.dependencyPath && selectedFinding.dependencyPath.length > 0 ? (
                       <div className="">
                         <p className="text-sm mt-5 uppercase tracking-[0.24em] text-[#94A3B8]">Location</p>
@@ -408,42 +392,30 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                     <div className="">
                       <p className="text-sm mt-6 uppercase tracking-[0.24em] text-[#94A3B8]">References</p>
                       <div className="mt-3 space-y-2">
-                        
                         {selectedReferences.length === 0 ? (
                           <p className="text-[#CBD5E1]">No references available.</p>
                         ) : (
                           selectedReferences.map((reference) => (
-                            
-                            <a
-                              key={reference}
-                              href={reference}
-                              target="_blank"
-                              rel="noreferrer"
-                              className=" flex gap-2 items-center  block truncate text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]"
-                            >
-                            <ExternalLink size={16} strokeWidth={2} />
-                              {reference}
+                            <a key={reference} href={reference} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
+                              <ExternalLink size={16} strokeWidth={2} className="shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{reference}</span>
                             </a>
                           ))
                         )}
                       </div>
                     </div>
-
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="">
                         <p className="text-sm mt-3 uppercase tracking-[0.24em] text-[#94A3B8]">Published Date</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.publishedAt)}</p>
                       </div>
                     </div>
-
-
-
                     {advisoryLink ? (
                       <div className="">
                         <p className="text-sm uppercase tracking-[0.24em] text-[#94A3B8]">Advisory Information</p>
-                        <a href={advisoryLink} target="_blank" rel="noreferrer" className="mt-2 block flex gap-2 items-center break-words leading-6 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
-                          <ExternalLink size={16} strokeWidth={2} />
-                          {advisoryLink}
+                        <a href={advisoryLink} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 break-words leading-6 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
+                          <ExternalLink size={16} strokeWidth={2} className="shrink-0" />
+                          <span className="break-words">{advisoryLink}</span>
                         </a>
                       </div>
                     ) : null}
