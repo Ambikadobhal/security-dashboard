@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 2,
-  "CreatedAt": "2026-07-13T09:41:22.183477Z",
+  "CreatedAt": "2026-07-26T10:30:00Z",
   "ArtifactName": "myapp:1.4.0",
   "ArtifactType": "container_image",
   "Metadata": {

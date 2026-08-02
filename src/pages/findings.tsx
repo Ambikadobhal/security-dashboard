@@ -11,6 +11,8 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import type { Findings } from '../parser/types';
+import { ExternalLink } from 'lucide-react';
+
 
 interface FindingsPageProps {
   findings: Findings[];
@@ -163,6 +165,7 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
     if (!selectedFinding) return undefined;
     return selectedFinding.advisoryUrl ?? selectedReferences.find((reference) => /github\.com\/advisories|ghsa/i.test(reference)) ?? selectedReferences[0] ?? undefined;
   }, [selectedFinding, selectedReferences]);
+
 
   return (
     <div className="min-h-screen bg-[#0B1220] px-4 py-6 text-[#F8FAFC] sm:px-6 lg:px-8">
@@ -328,32 +331,41 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                 <div className="flex items-center justify-between border-b border-[#273548] px-5 py-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-[#22D3EE]">Vulnerability Details</p>
-                    <h2 className="mt-1 text-lg font-semibold text-[#F8FAFC]">{selectedFinding.vulnerabilityId}</h2>
+                    <div className="mt-2 flex items-center justify-center gap-4">
+                      <span
+                        className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-semibold ${getSeverityTone(
+                          (selectedFinding.severity ?? "info").toUpperCase()
+                        )}`}
+                      >
+                        {(selectedFinding.severity ?? "info").toUpperCase()}
+                      </span>
+
+                      <h2 className="flex h-8 items-center text-md font-semibold leading-none text-[#F8FAFC]">
+                        {selectedFinding.vulnerabilityId}
+                      </h2>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedFinding(null)}
-                    className="rounded-full border border-[#273548] p-2 text-[#CBD5E1] transition-colors duration-200 hover:border-[#3B82F6] hover:text-[#F8FAFC]"
+                    className="px-2 py-2 text-[#CBD5E1] transition-colors duration-200 "
                   >
                     ×
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-5 py-5">
                   <div className="space-y-4 text-sm text-[#CBD5E1]">
-                    <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityTone((selectedFinding.severity ?? 'info').toUpperCase())}`}>
-                          {(selectedFinding.severity ?? 'info').toUpperCase()}
-                        </span>
-                        <span className="text-[#94A3B8]">{formatValue(selectedFinding.title)}</span>
-                      </div>
-                      <p className="mt-3 break-words text-base font-semibold text-[#F8FAFC]">{formatValue(selectedFinding.title)}</p>
+                    <div className="rounded-2xl">
+                      <p className="break-words text-base font-semibold text-[#F8FAFC]">{formatValue(selectedFinding.title)}</p>
                     </div>
-
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Package</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.packageName)}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CVSS Score</p>
+                        <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.cvssScore)}</p>
                       </div>
                       <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
                         <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Installed Version</p>
@@ -364,41 +376,52 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.fixedVersion)}</p>
                       </div>
                     </div>
-
-                    <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Description</p>
+                    <div className="space-y-3">
+                      <p className="text-sm uppercase tracking-[0.24em] text-[#94A3B8]">
+                        CVSS Vector
+                      </p>
+                      <div className="rounded-xl border border-[#273548] bg-[#182231] px-4 py-2">
+                        <p className="break-words font-medium text-[#F8FAFC]">
+                          {formatValue(selectedFinding.cvssVector)}
+                        </p>
+                      </div>
+                      {(selectedFinding.cweIds?.length ?? 0) > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-2">
+                          {(selectedFinding.cweIds ?? []).map((cwe) => (
+                            <span
+                              className="inline-flex items-center rounded-lg border border-[#24334A] bg-[#1A2437] px-2 py-0.5 text-xs font-medium text-[#B8C6DD]">
+                              {cwe}
+                            </span>))}</div>)}
+                    </div>
+                    <div className="mt-7">
+                      <p className="text-sm uppercase tracking-[0.24em] text-[#94A3B8]">Description</p>
                       <p className="mt-2 whitespace-pre-wrap leading-6 text-[#CBD5E1]">{formatValue(selectedFinding.description ?? 'No additional description provided for this finding.')}</p>
                     </div>
+                    
+                    {selectedFinding.dependencyPath && selectedFinding.dependencyPath.length > 0 ? (
+                      <div className="">
+                        <p className="text-sm mt-5 uppercase tracking-[0.24em] text-[#94A3B8]">Location</p>
+                        <p className="mt-1 break-words leading-6 tracking-[0.05em] text-[#CBD5E1]">{selectedFinding.dependencyPath.join(' → ')}</p>
+                      </div>
+                    ) : null}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CVSS Score</p>
-                        <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.cvssScore)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CVSS Vector</p>
-                        <p className="mt-2 break-words font-medium text-[#F8FAFC]">{formatValue(selectedFinding.cvssVector)}</p>
-                      </div>
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">CWE</p>
-                        <p className="mt-2 font-medium text-[#F8FAFC]">{(selectedFinding.cweIds ?? []).join(', ') || '—'}</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">References</p>
+                    <div className="">
+                      <p className="text-sm mt-6 uppercase tracking-[0.24em] text-[#94A3B8]">References</p>
                       <div className="mt-3 space-y-2">
+                        
                         {selectedReferences.length === 0 ? (
                           <p className="text-[#CBD5E1]">No references available.</p>
                         ) : (
                           selectedReferences.map((reference) => (
+                            
                             <a
                               key={reference}
                               href={reference}
                               target="_blank"
                               rel="noreferrer"
-                              className="block truncate text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]"
+                              className=" flex gap-2 items-center  block truncate text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]"
                             >
+                            <ExternalLink size={16} strokeWidth={2} />
                               {reference}
                             </a>
                           ))
@@ -407,23 +430,19 @@ export default function FindingsPage({ findings }: FindingsPageProps) {
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Published Date</p>
+                      <div className="">
+                        <p className="text-sm mt-3 uppercase tracking-[0.24em] text-[#94A3B8]">Published Date</p>
                         <p className="mt-2 font-medium text-[#F8FAFC]">{formatValue(selectedFinding.publishedAt)}</p>
                       </div>
                     </div>
 
-                    {selectedFinding.dependencyPath && selectedFinding.dependencyPath.length > 0 ? (
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Dependency Path</p>
-                        <p className="mt-2 break-words leading-6 text-[#CBD5E1]">{selectedFinding.dependencyPath.join(' → ')}</p>
-                      </div>
-                    ) : null}
+
 
                     {advisoryLink ? (
-                      <div className="rounded-2xl border border-[#273548] bg-[#182231] p-4">
-                        <p className="text-xs uppercase tracking-[0.24em] text-[#94A3B8]">Advisory Information</p>
-                        <a href={advisoryLink} target="_blank" rel="noreferrer" className="mt-2 block break-words leading-6 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
+                      <div className="">
+                        <p className="text-sm uppercase tracking-[0.24em] text-[#94A3B8]">Advisory Information</p>
+                        <a href={advisoryLink} target="_blank" rel="noreferrer" className="mt-2 block flex gap-2 items-center break-words leading-6 text-[#60A5FA] underline-offset-2 hover:text-[#22D3EE]">
+                          <ExternalLink size={16} strokeWidth={2} />
                           {advisoryLink}
                         </a>
                       </div>
